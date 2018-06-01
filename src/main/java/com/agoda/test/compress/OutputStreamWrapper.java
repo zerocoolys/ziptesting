@@ -7,6 +7,8 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * OutputStreamWrapper
@@ -16,36 +18,39 @@ import java.nio.file.Paths;
  */
 public class OutputStreamWrapper {
 
-    private final String output;
     private final Path outputPath;
     private final int size;
     private int id;
     private int count = 0;
 
+    private List<String> fileNames = new ArrayList<>();
     private int counter = 0;
 
     private final String FILENAME = "default.data";
+
+    private String fileName = FILENAME;
     private OutputStream outputStream;
 
-    public OutputStreamWrapper(String output, int size) throws IOException {
-        this.output = output;
+    public OutputStreamWrapper(Path output, int size) throws IOException {
         this.size = size;
         this.id = 0;
-        this.outputPath = Paths.get(output);
+        this.outputPath = output;
 
         Files.createDirectories(this.outputPath);
     }
 
     public boolean init() {
         try {
-            Files.list(Paths.get(this.output)).filter(path -> path.getFileName().toString().startsWith(FILENAME)).forEach(path -> {
+            Files.list(this.outputPath).filter(path -> path.getFileName().toString().startsWith(fileName)).forEach(path -> {
                 try {
                     Files.delete(path);
                 } catch (IOException io) {
                     io.printStackTrace();
                 }
             });
-            this.outputStream = Files.newOutputStream(Paths.get(output, FILENAME));
+
+            this.outputStream = Files.newOutputStream(Paths.get(outputPath.toString(), fileName));
+            fileNames.add(fileName);
             return true;
         } catch (IOException e) {
             e.printStackTrace();
@@ -70,7 +75,7 @@ public class OutputStreamWrapper {
 
     public void writeBytes(byte[] bytes, int len) {
 
-        System.out.println(++counter + ": len = " + len);
+//        System.out.println(++counter + ": len = " + len);
 
 //        if (len < 1000) {
 //        }
@@ -83,7 +88,9 @@ public class OutputStreamWrapper {
                 this.outputStream.flush();
                 this.outputStream.close();
 
-                this.outputStream = Files.newOutputStream(Paths.get(this.output, FILENAME + "." + id++));
+                String newName = fileName + "." + id++;
+                fileNames.add(newName);
+                this.outputStream = Files.newOutputStream(Paths.get(this.outputPath.toString(), newName));
                 outputStream.write(bytes, actual, len - actual);
                 count = len - actual;
             } else {
@@ -104,4 +111,16 @@ public class OutputStreamWrapper {
         return current + len > size;
     }
 
+    public String getFileName() {
+        return fileName;
+    }
+
+    public OutputStreamWrapper setFileName(String fileName) {
+        this.fileName = fileName;
+        return this;
+    }
+
+    public List<String> getFileNames() {
+        return fileNames;
+    }
 }

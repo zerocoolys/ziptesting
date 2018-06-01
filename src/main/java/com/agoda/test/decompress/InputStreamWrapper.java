@@ -2,6 +2,7 @@ package com.agoda.test.decompress;
 
 
 import com.agoda.test.app.ByteBufUtils;
+import com.agoda.test.app.FileNameUtils;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -39,7 +40,7 @@ public class InputStreamWrapper {
 
             List<Path> paths = stream
                     .filter(path -> path.getFileName().toString().startsWith("default.data"))
-                    .sorted(Comparator.comparing(this::getFileId))
+                    .sorted(Comparator.comparing(FileNameUtils::getFileId))
                     .collect(Collectors.toList());
 
             if (paths.isEmpty()) {
@@ -53,15 +54,6 @@ public class InputStreamWrapper {
         }
     }
 
-    public Integer getFileId(Path path) {
-        String name = path.getFileName().toString();
-        String suffix = name.substring(name.lastIndexOf(".") + 1);
-        try {
-            return Integer.parseInt(suffix) + 1;
-        } catch (Exception ex) {
-            return 0;
-        }
-    }
 
     public boolean isFinished() {
         try {

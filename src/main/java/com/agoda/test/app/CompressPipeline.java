@@ -10,6 +10,9 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -20,52 +23,115 @@ import java.util.stream.Stream;
  */
 public class CompressPipeline implements FileType {
 
-    private final String input;
-    private final String output;
+    private final Path input;
+    private final Path output;
     private final int size;
 
     private CompressHandler compressHandler;
     private OutputStreamWrapper wrapper;
+
+    private ExecutorService service = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
 
     public CompressPipeline(String input, String output, int size) {
         this(input, output, size, new DeflaterCompressHandler(size));
     }
 
     public CompressPipeline(String input, String output, int size, CompressHandler compressHandler) {
-        this.input = input;
-        this.output = output;
+        this.input = Paths.get(input);
+        this.output = Paths.get(output);
         this.size = size * 1024 * 1024;
         this.compressHandler = compressHandler;
     }
 
 
     public void compress() throws IOException {
-        Path file = Paths.get(input);
+
+        cleanOutputPath(this.output);
 
         wrapper = new OutputStreamWrapper(this.output, this.size);
         wrapper.init();
 
-        Path parent = Paths.get(this.output).getParent();
+        Path parent = this.output.getParent();
         if (parent != null) {
             Files.createDirectories(parent);
         }
 
-        byte[] buf = ByteBufUtils.requireArray(size);
-
-        wrapper.writeInt(buf.length);
-        doCompress(file, buf);
+        wrapper.writeInt(size);
+        doCompress(this.input, size);
     }
 
+    private void cleanOutputPath(Path output) {
 
-    private void doCompress(Path file, byte[] buf) {
-        if (file.toFile().isDirectory()) {
-            doCompressDir(file, buf);
-        } else {
-            doCompressFile(file, buf);
+        try {
+            Files.walk(output).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException io) {
+                }
+            });
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
-    private void doCompressDir(Path file, byte[] buf) {
+
+    private void doCompress(Path file, int size) {
+        Collection<CompressWorker> workers = new ArrayList<>();
+
+        if (file.toFile().isDirectory()) {
+            doCompressDir(file, size, workers);
+        } else {
+            doCompressFile(file, size);
+        }
+
+        try {
+            List<Future<String>> futures = service.invokeAll(workers);
+            List<String> ids = futures.parallelStream().map(f -> {
+                try {
+                    return f.get();
+                } catch (InterruptedException | ExecutionException e) {
+                    e.printStackTrace();
+                }
+                return null;
+            }).filter(Objects::nonNull).collect(Collectors.toList());
+
+
+            merge(ids);
+
+            service.shutdown();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void merge(List<String> ids) {
+        System.out.println("ids = " + ids.toString());
+
+        ids.stream().map(id -> id.split(","))
+                .flatMap(Arrays::stream)
+                .map(name -> Paths.get(this.output.toString(), name))
+                .sorted(Comparator.comparing(FileNameUtils::getFileId))
+                .forEach(path -> {
+                    try {
+                        InputStream is = Files.newInputStream(path);
+                        byte[] buf = new byte[size / 10];
+                        int c = -1;
+                        while ((c = is.read(buf)) != -1) {
+                            this.wrapper.writeBytes(buf, c);
+                        }
+
+                        Files.deleteIfExists(path);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
+                });
+
+//        this.wrapper.writeBytes();
+
+    }
+
+    private void doCompressDir(Path file, int size, Collection<CompressWorker> workers) {
 
         System.out.println("dir = " + file.toString());
         // type bit for file
@@ -73,14 +139,29 @@ public class CompressPipeline implements FileType {
         wrapper.writeString(file.toString());
 
         try (Stream<Path> dirs = Files.list(file)) {
-            dirs.parallel().filter(path -> !path.getFileName().toString().startsWith("."))
-                    .forEach(file1 -> doCompress(file1, buf));
+
+            CompressWorker worker = new CompressWorker(size,
+                    this.output,
+                    dirs.filter(path -> !path.getFileName().toString().startsWith(".")).filter(path -> Files.isRegularFile(path)).collect(Collectors.toList()));
+            workers.add(worker);
         } catch (IOException ex) {
             ex.printStackTrace();
         }
+
+        try (Stream<Path> dirs = Files.list(file)) {
+            dirs.filter(path -> !path.getFileName().toString().startsWith(".")).filter(Files::isDirectory).forEach(path -> this.doCompressDir(path, size, workers));
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
-    private void doCompressFile(Path file, byte[] buf) {
+    private void doCompressFile(Path file, int size) {
+        doCompressFile(this.wrapper, file, size);
+    }
+
+
+    private void doCompressFile(OutputStreamWrapper wrapper, Path file, int size) {
 
 //        byte[] fileData = splitFile(file, size);
 
@@ -91,7 +172,8 @@ public class CompressPipeline implements FileType {
             wrapper.writeString(file.toString());
 
             int len = -1;
-            byte[] outputBuf = new byte[buf.length];
+            byte[] buf = new byte[size];
+            byte[] outputBuf = new byte[size];
 
             int total = fileInputStream.available();
             wrapper.writeInt(total);
@@ -107,6 +189,35 @@ public class CompressPipeline implements FileType {
             }
         } catch (IOException ex) {
             ex.printStackTrace();
+        }
+
+    }
+
+    class CompressWorker implements Callable<String> {
+
+        private final int size;
+        private List<Path> paths;
+        private final Path output;
+        private final String id;
+
+        public CompressWorker(int size, Path output, List<Path> paths) {
+            this.size = size;
+            this.paths = paths;
+            this.output = output;
+            id = UUID.randomUUID().toString();
+        }
+
+        @Override
+        public String call() throws Exception {
+            if (paths.isEmpty()) {
+                return null;
+            }
+            OutputStreamWrapper outputStreamWrapper = new OutputStreamWrapper(this.output, this.size);
+            outputStreamWrapper.setFileName(id);
+            outputStreamWrapper.init();
+
+            paths.forEach(path -> doCompressFile(outputStreamWrapper, path, size));
+            return outputStreamWrapper.getFileNames().stream().collect(Collectors.joining(","));
         }
 
     }
