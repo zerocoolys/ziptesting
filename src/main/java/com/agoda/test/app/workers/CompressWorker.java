@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 /**
@@ -35,7 +34,6 @@ public class CompressWorker implements Callable<List<String>> {
     private final CompressHandler compressHandler;
     private final Path parent;
     private List<Path> paths;
-    private final int MULTI_THREAD_THRESHOLD = 10;
     private CountDownLatch latch;
 
     public CompressWorker(int size, CompressHandler compressHandler, Path parent, Path output, List<Path> paths) {

@@ -7,16 +7,16 @@ import com.agoda.test.compress.CompressHandler;
 import com.agoda.test.compress.DeflaterCompressHandler;
 import com.agoda.test.compress.OutputStreamWrapper;
 import com.agoda.test.utils.CompressUtils;
+import com.agoda.test.utils.Predicates;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -31,11 +31,14 @@ public class CompressPipeline implements ByteType {
     private final Path input;
     private final Path output;
     private final int size;
-    
+
     private final List<Callable<List<String>>> callables = new ArrayList<>();
+
     private final Path inputRoot;
     private CompressHandler compressHandler;
     private OutputStreamWrapper wrapper;
+
+
 //    private ExecutorCompletionService<List<String>> completionService = new ExecutorCompletionService(executorService);
 
     private CompressWorkerExecutor<List<String>> compressWorkerExecutor = new CompressWorkerExecutor<>();
@@ -66,9 +69,22 @@ public class CompressPipeline implements ByteType {
         int bufSize = ByteBufUtils.requireArray();
         wrapper.writeInt(bufSize);
         doCompress(this.input, size);
+
+
     }
 
     private void doCompress(Path file, int size) {
+
+        try {
+            long fileCount = Files
+                    .find(file, Integer.MAX_VALUE, (path, basicFileAttributes) -> basicFileAttributes.isRegularFile())
+                    .filter(Predicates.pathTypePredicate)
+                    .count();
+            System.out.println("fileCount = " + fileCount);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         if (file.toFile().isDirectory()) {
             doCompressDir(file, size);
@@ -114,16 +130,10 @@ public class CompressPipeline implements ByteType {
 
         try (Stream<Path> dirs = Files.list(file)) {
 
-            List<Path> files = dirs.filter(path -> !path.getFileName().toString().startsWith(".") && !path.getFileName().toString().endsWith(".zip"))
-                    .filter(Files::isRegularFile)
+            List<CompressWorker> files = dirs.filter(Predicates.allPredicate)
+                    .map(path -> new CompressWorker(size, this.compressHandler, this.inputRoot, this.output, Arrays.asList(path)))
                     .collect(Collectors.toList());
-            if (files.size() > 0) {
-
-                // file compress worker
-                CompressWorker worker = new CompressWorker(size, this.compressHandler, this.inputRoot, this.output, files);
-
-                callables.add(worker);
-            }
+            callables.addAll(files);
 
         } catch (IOException ex) {
             ex.printStackTrace();
