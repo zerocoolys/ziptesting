@@ -20,13 +20,6 @@ public class DeflaterCompressHandler implements CompressHandler {
     }
 
     @Override
-    public byte[] compress(Path file) {
-
-
-        return new byte[0];
-    }
-
-    @Override
     public int compress(byte[] buf, byte[] output, int i, int len) {
         Deflater compresser = new Deflater();
         compresser.setInput(buf, i, len);

@@ -7,6 +7,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,14 +21,10 @@ public class OutputStreamWrapper {
 
     private final Path outputPath;
     private final int size;
+    private final String FILENAME = "default.data";
     private int id;
     private int count = 0;
-
     private List<String> fileNames = new ArrayList<>();
-    private int counter = 0;
-
-    private final String FILENAME = "default.data";
-
     private String fileName = FILENAME;
     private OutputStream outputStream;
 
@@ -42,14 +39,10 @@ public class OutputStreamWrapper {
     public boolean init() {
         try {
             Files.list(this.outputPath).filter(path -> path.getFileName().toString().startsWith(fileName)).forEach(path -> {
-                try {
-                    Files.delete(path);
-                } catch (IOException io) {
-                    io.printStackTrace();
-                }
+                path.toFile().delete();
             });
 
-            this.outputStream = Files.newOutputStream(Paths.get(outputPath.toString(), fileName));
+            this.outputStream = Files.newOutputStream(Paths.get(outputPath.toString(), fileName), StandardOpenOption.CREATE);
             fileNames.add(fileName);
             return true;
         } catch (IOException e) {
@@ -75,11 +68,6 @@ public class OutputStreamWrapper {
 
     public void writeBytes(byte[] bytes, int len) {
 
-//        System.out.println(++counter + ": len = " + len);
-
-//        if (len < 1000) {
-//        }
-
         try {
             if (ifOverLimitation(count, len, size)) {
                 int actual = size - count;
@@ -90,7 +78,7 @@ public class OutputStreamWrapper {
 
                 String newName = fileName + "." + id++;
                 fileNames.add(newName);
-                this.outputStream = Files.newOutputStream(Paths.get(this.outputPath.toString(), newName));
+                this.outputStream = Files.newOutputStream(Paths.get(this.outputPath.toString(), newName), StandardOpenOption.CREATE);
                 outputStream.write(bytes, actual, len - actual);
                 count = len - actual;
             } else {

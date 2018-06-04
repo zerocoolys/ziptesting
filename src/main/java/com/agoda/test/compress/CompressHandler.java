@@ -10,8 +10,14 @@ import java.nio.file.Path;
  */
 public interface CompressHandler {
 
-    byte[] compress(Path path);
-
-
-    int compress(byte[] buf, byte[] output, int i, int len);
+    /**
+     *
+     * @param data source data
+     * @param output output array of compressed data
+     * @param i the start offset of source data
+     * @param len the length of source data
+     *
+     * @return the actual data length after compressed
+     */
+    int compress(byte[] data, byte[] output, int i, int len);
 }

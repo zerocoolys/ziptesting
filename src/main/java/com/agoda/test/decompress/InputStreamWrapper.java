@@ -83,28 +83,7 @@ public class InputStreamWrapper {
         byte[] tmp = readBytes(4);
 
         return ByteBufUtils.parseInt(tmp);
-//        try {
-//            if (this.inputStream.available() >= 4) {
-//                return ByteBufUtils.readInt(this.inputStream);
-//            } else {
-//
-//                int actual = this.inputStream.available();
-//                byte[] tmp = new byte[4];
-//                this.inputStream.read(tmp, 0, actual);
-//
-//                if (!setupInputStream(queue.poll())) {
-//                    throw new Exception("compressed data missing.");
-//                }
-//
-//                this.inputStream.read(tmp, actual, 4 - actual);
-//
-//                return ByteBufUtils.parseInt(tmp);
-//            }
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//
-//        return -1;
+
     }
 
 
@@ -117,28 +96,6 @@ public class InputStreamWrapper {
             return new String(bytes);
         }
 
-//        try {
-//            if (this.inputStream.available() >= len) {
-//                return ByteBufUtils.readString(this.inputStream, len);
-//            } else {
-//
-//                int actual = this.inputStream.available();
-//                byte[] tmp = new byte[len];
-//                this.inputStream.read(tmp, 0, actual);
-//
-//                if (!setupInputStream(queue.poll())) {
-//                    throw new Exception("compressed data missing.");
-//                }
-//
-//                this.inputStream.read(tmp, actual, len - actual);
-//
-//                return new String(tmp);
-//            }
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-
-//        return null;
     }
 
 
@@ -163,10 +120,8 @@ public class InputStreamWrapper {
             e.printStackTrace();
         }
 
-        System.out.println(++counter + " : len =  " + len);
 
         return bytes;
     }
 
-    int counter = 0;
 }
