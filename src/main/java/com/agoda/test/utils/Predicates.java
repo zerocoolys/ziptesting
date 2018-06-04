@@ -12,9 +12,14 @@ import java.util.function.Predicate;
  */
 public interface Predicates {
 
-    Predicate<Path> pathTypePredicate = path -> !path.getFileName().toString().startsWith(".") && !path.getFileName().toString().endsWith(".zip");
+    Predicate<Path> FILE_TYPE_PREDICATE = path -> !path.getFileName().toString().startsWith(".") && !path.getFileName().toString().endsWith(".zip");
 
-    Predicate<Path> isFile = Files::isRegularFile;
+    Predicate<Path> IS_FILE = Files::isRegularFile;
 
-    Predicate<Path> allPredicate = isFile.and(pathTypePredicate);
+    Predicate<Path> DIR_TYPE_PREDICATE = path -> !path.getFileName().toString().startsWith(".");
+    Predicate<Path> IS_DIR = Files::isDirectory;
+
+    Predicate<Path> ALL_DIR_PREDICATE = IS_DIR.and(DIR_TYPE_PREDICATE);
+
+    Predicate<Path> ALL_FILE_PREDICATE = IS_FILE.and(FILE_TYPE_PREDICATE);
 }
