@@ -1,6 +1,6 @@
 package com.agoda.test.app;
 
-import com.agoda.test.app.commons.FileType;
+import com.agoda.test.app.commons.ByteType;
 import com.agoda.test.decompress.DecompressHandler;
 import com.agoda.test.decompress.InflaterDecompressHandler;
 import com.agoda.test.decompress.InputStreamWrapper;
@@ -20,7 +20,7 @@ import java.nio.file.StandardOpenOption;
  * @author yousheng
  * @since 2018/5/28
  */
-public class DecompressPipeline implements FileType {
+public class DecompressPipeline implements ByteType {
 
     public static final String DEFAULT_FILENAME = "default.data";
     private final String input;
@@ -42,14 +42,15 @@ public class DecompressPipeline implements FileType {
         InputStreamWrapper wrapper = new InputStreamWrapper(input);
         wrapper.init();
 
-        int bufSize = wrapper.readInt();
+        int bufSize = (int) wrapper.readVal();
         while (!wrapper.isFinished()) {
 
             byte[] type = wrapper.readBytes(1);
-            if (type[0] == FileType.BIT_FILE) {
-                int len = wrapper.readInt();
+            if (type[0] == BIT_FILE) {
+                int len = (int) wrapper.readVal();
 
                 String fileName = wrapper.readString(len);
+//                System.out.println("fileName = " + fileName);
                 Path tmp = Paths.get(output, fileName);
 
                 Files.createDirectories(tmp.getParent());
@@ -57,18 +58,18 @@ public class DecompressPipeline implements FileType {
                 if (!Files.exists(tmp)) {
                     Files.createFile(tmp);
                 }
-                int total = wrapper.readInt();
-                System.out.println("total = " + total);
+                long total = wrapper.readVal();
+//                System.out.println("total = " + total);
 
                 OutputStream outputStream = Files.newOutputStream(tmp, StandardOpenOption.CREATE);
                 while (total != 0) {
-                    len = wrapper.readInt();
+                    len = (int) wrapper.readVal();
 
                     byte[] val = wrapper.readBytes(len);
                     byte[] result = new byte[bufSize];
                     int length = decompressHandler.decompress(val, result, 0, val.length);
 
-//                    System.out.println("before decompress: " + len + " , after decompress: " + length);
+//                    System.out.println("before decompress: " + val.length + " , after decompress: " + length + ", delta : " + (length - len));
                     outputStream.write(result, 0, length);
                     total -= length;
 //                    System.out.println("total = " + total);
@@ -77,9 +78,10 @@ public class DecompressPipeline implements FileType {
                 outputStream.flush();
                 outputStream.close();
             } else {
-                int len = wrapper.readInt();
+                int len = (int) wrapper.readVal();
 
                 String dirName = wrapper.readString(len);
+//                System.out.println("dirName = " + dirName);
                 Path tmp = Paths.get(output, dirName);
 
                 Files.createDirectories(tmp);

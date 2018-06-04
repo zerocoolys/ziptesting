@@ -13,31 +13,11 @@ import java.nio.ByteBuffer;
  */
 public class ByteBufUtils {
 
-    public static byte[] requireArray(long size) {
-        if (size >= Runtime.getRuntime().freeMemory()) {
+    public static final int BUF_SIZE = (int) (Runtime.getRuntime().totalMemory() / 100);
 
-            if (Runtime.getRuntime().freeMemory() > Integer.MAX_VALUE) {
-                return new byte[Integer.MAX_VALUE / 2];
-            } else {
-                return new byte[(int) (Runtime.getRuntime().freeMemory() / 2)];
-            }
-        } else {
-            return new byte[(int) size];
-        }
+    public static int requireArray() {
+        return BUF_SIZE;
     }
-
-//    public static int require(long size) {
-//        if (size >= Runtime.getRuntime().freeMemory()) {
-//
-//            if (Runtime.getRuntime().freeMemory() > Integer.MAX_VALUE) {
-//                return Integer.MAX_VALUE / 2;
-//            } else {
-//                return (int) (Runtime.getRuntime().freeMemory() / 2);
-//            }
-//        } else {
-//            return (int) size;
-//        }
-//    }
 
 
     public static byte[] convertInt(int val) {
@@ -75,5 +55,16 @@ public class ByteBufUtils {
     public static void writeString(OutputStream outputStream, String str) throws IOException {
         outputStream.write(ByteBufUtils.convertInt(str.length()));
         outputStream.write(str.getBytes());
+    }
+
+    public static byte[] convertLong(long val) {
+        ByteBuffer buffer = ByteBuffer.allocate(8);
+        buffer.putLong(val);
+
+        return buffer.array();
+    }
+
+    public static long parseLong(byte[] data) {
+        return ByteBuffer.wrap(data).getLong();
     }
 }

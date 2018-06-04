@@ -1,6 +1,7 @@
 package com.agoda.test.compress;
 
 import com.agoda.test.app.ByteBufUtils;
+import com.agoda.test.app.commons.ByteType;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -17,7 +18,7 @@ import java.util.List;
  * @author yousheng
  * @since 2018/5/31
  */
-public class OutputStreamWrapper {
+public class OutputStreamWrapper implements ByteType {
 
     private final Path outputPath;
     private final int size;
@@ -53,11 +54,19 @@ public class OutputStreamWrapper {
 
     public void writeInt(int val) {
         byte[] bytes = ByteBufUtils.convertInt(val);
+        writeByte(BIT_INT);
         writeBytes(bytes);
 
     }
 
+    public void writeLong(long val) {
+        byte[] bytes = ByteBufUtils.convertLong(val);
+        writeByte(BIT_LONG);
+        writeBytes(bytes);
+    }
+
     public void writeString(String val) {
+//        System.out.println("val = " + val);
         writeInt(val.length());
         writeBytes(val.getBytes());
     }

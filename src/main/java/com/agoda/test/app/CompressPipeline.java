@@ -1,17 +1,22 @@
 package com.agoda.test.app;
 
-import com.agoda.test.app.commons.FileType;
+import com.agoda.test.app.commons.ByteType;
+import com.agoda.test.app.workers.CompressWorker;
+import com.agoda.test.app.workers.CompressWorkerExecutor;
 import com.agoda.test.compress.CompressHandler;
 import com.agoda.test.compress.DeflaterCompressHandler;
 import com.agoda.test.compress.OutputStreamWrapper;
+import com.agoda.test.utils.CompressUtils;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -21,17 +26,19 @@ import java.util.stream.Stream;
  * @author yousheng
  * @since 2018/5/28
  */
-public class CompressPipeline implements FileType {
+public class CompressPipeline implements ByteType {
 
     private final Path input;
     private final Path output;
     private final int size;
-    private final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
-
+    
     private final List<Callable<List<String>>> callables = new ArrayList<>();
+    private final Path inputRoot;
     private CompressHandler compressHandler;
     private OutputStreamWrapper wrapper;
-    private ExecutorCompletionService<List<String>> completionService = new ExecutorCompletionService(executorService);
+//    private ExecutorCompletionService<List<String>> completionService = new ExecutorCompletionService(executorService);
+
+    private CompressWorkerExecutor<List<String>> compressWorkerExecutor = new CompressWorkerExecutor<>();
 
     public CompressPipeline(String input, String output, int size) {
         this(input, output, size, new DeflaterCompressHandler(size));
@@ -39,6 +46,7 @@ public class CompressPipeline implements FileType {
 
     public CompressPipeline(String input, String output, int size, CompressHandler compressHandler) {
         this.input = Paths.get(input);
+        this.inputRoot = this.input.getParent();
         this.output = Paths.get(output);
         this.size = size * 1024 * 1024;
         this.compressHandler = compressHandler;
@@ -55,7 +63,8 @@ public class CompressPipeline implements FileType {
             Files.createDirectories(parent);
         }
 
-        wrapper.writeInt(size);
+        int bufSize = ByteBufUtils.requireArray();
+        wrapper.writeInt(bufSize);
         doCompress(this.input, size);
     }
 
@@ -64,55 +73,29 @@ public class CompressPipeline implements FileType {
         if (file.toFile().isDirectory()) {
             doCompressDir(file, size);
         } else {
-            doCompressFile(file, size);
+            CompressUtils.doCompressFile(this.wrapper, compressHandler, this.inputRoot, file);
         }
 
         if (callables.isEmpty()) {
             return;
         }
 
-        callables.forEach(completionService::submit);
+        compressWorkerExecutor.submit(callables);
 
         int n = callables.size();
         while (n > 0) {
             try {
-                List<String> fileIds = completionService.take().get();
+                List<String> fileIds = compressWorkerExecutor.take();
                 if (fileIds == null || fileIds.isEmpty()) {
                     continue;
                 }
-                merge(fileIds);
-
-
-            } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
+                CompressUtils.merge(this.wrapper, this.output, fileIds);
             } finally {
                 n--;
             }
         }
 
-        executorService.shutdown();
-    }
-
-    private void merge(List<String> ids) {
-        System.out.println("merge = " + ids);
-
-        ids.stream().map(s -> Paths.get(this.output.toString(), s))
-                .sorted(Comparator.comparing(FileNameUtils::getFileId))
-                .forEach(path -> {
-                    try {
-                        InputStream is = Files.newInputStream(path);
-                        byte[] buf = new byte[size / 10];
-                        int c = -1;
-                        while ((c = is.read(buf)) != -1) {
-                            this.wrapper.writeBytes(buf, c);
-                        }
-
-                        Files.deleteIfExists(path);
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
-                    }
-                });
-
+        compressWorkerExecutor.shutdown();
     }
 
     /**
@@ -126,16 +109,18 @@ public class CompressPipeline implements FileType {
 
         // type bit for file
         wrapper.writeByte(BIT_DIR);
-        wrapper.writeString(file.toString());
+
+        CompressUtils.writeFileName(this.wrapper, this.inputRoot, file);
 
         try (Stream<Path> dirs = Files.list(file)) {
 
-            List<Path> files = dirs.filter(path -> !path.getFileName().toString().startsWith("."))
+            List<Path> files = dirs.filter(path -> !path.getFileName().toString().startsWith(".") && !path.getFileName().toString().endsWith(".zip"))
                     .filter(Files::isRegularFile)
                     .collect(Collectors.toList());
             if (files.size() > 0) {
+
                 // file compress worker
-                CompressWorker worker = new CompressWorker(size, this.output, files);
+                CompressWorker worker = new CompressWorker(size, this.compressHandler, this.inputRoot, this.output, files);
 
                 callables.add(worker);
             }
@@ -152,79 +137,6 @@ public class CompressPipeline implements FileType {
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    private void doCompressFile(Path file, int size) {
-        doCompressFile(this.wrapper, file, size);
-    }
-
-
-    private void doCompressFile(OutputStreamWrapper wrapper, Path file, int size) {
-
-
-        try (InputStream fileInputStream = Files.newInputStream(file)) {
-
-            wrapper.writeByte(BIT_FILE);
-            wrapper.writeString(file.toString());
-
-            int len = -1;
-            byte[] buf = ByteBufUtils.requireArray(size);
-            byte[] outputBuf = new byte[buf.length];
-
-            int total = fileInputStream.available();
-            wrapper.writeInt(total);
-            while ((len = fileInputStream.read(buf)) != -1) {
-
-                int outputLen = compressHandler.compress(buf, outputBuf, 0, len);
-                total -= len;
-                wrapper.writeInt(outputLen);
-                wrapper.writeBytes(outputBuf, outputLen);
-
-            }
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-
-    }
-
-    class CompressWorker implements Callable<List<String>> {
-
-        private final int size;
-        private final Path output;
-        private final String id;
-        private List<Path> paths;
-
-        public CompressWorker(int size, Path output, List<Path> paths) {
-            this.size = size;
-            this.paths = paths;
-            this.output = output;
-            id = UUID.randomUUID().toString();
-        }
-
-        @Override
-        public List<String> call() {
-            if (paths.isEmpty()) {
-                return Collections.emptyList();
-            }
-            try {
-                OutputStreamWrapper outputStreamWrapper = new OutputStreamWrapper(this.output, this.size);
-                outputStreamWrapper.setFileName(id);
-                outputStreamWrapper.init();
-
-                paths.forEach(path -> doCompressFile(outputStreamWrapper, path, size));
-                return outputStreamWrapper
-                        .getFileNames()
-                        .stream()
-                        .sorted(Comparator.comparing(FileNameUtils::getFileId))
-                        .collect(Collectors.toList());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            return Collections.emptyList();
-
-        }
-
     }
 
 }

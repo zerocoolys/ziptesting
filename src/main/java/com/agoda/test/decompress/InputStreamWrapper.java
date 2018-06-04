@@ -3,6 +3,7 @@ package com.agoda.test.decompress;
 
 import com.agoda.test.app.ByteBufUtils;
 import com.agoda.test.app.FileNameUtils;
+import com.agoda.test.app.commons.ByteType;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -23,7 +24,7 @@ import java.util.stream.Stream;
  * @author yousheng
  * @since 2018/5/31
  */
-public class InputStreamWrapper {
+public class InputStreamWrapper implements ByteType {
 
     private String input;
 
@@ -78,11 +79,25 @@ public class InputStreamWrapper {
 
     }
 
+    public long readVal() {
+        byte[] bits = readBytes(1);
+        if (bits[0] == BIT_INT) {
+            return readInt();
+        } else {
+            return readLong();
+        }
+    }
 
     public int readInt() {
         byte[] tmp = readBytes(4);
 
         return ByteBufUtils.parseInt(tmp);
+    }
+
+    public long readLong() {
+        byte[] tmp = readBytes(8);
+
+        return ByteBufUtils.parseLong(tmp);
 
     }
 

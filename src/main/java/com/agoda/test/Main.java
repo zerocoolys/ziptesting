@@ -2,6 +2,7 @@ package com.agoda.test;
 
 import com.agoda.test.app.CompressPipeline;
 import com.agoda.test.app.DecompressPipeline;
+import org.apache.commons.cli.*;
 import org.apache.commons.lang3.time.StopWatch;
 
 import java.io.IOException;
@@ -14,18 +15,33 @@ import java.io.IOException;
  */
 public class Main {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, ParseException {
+
+        Options options = new Options()
+                .addRequiredOption("i", "input", true, "input path for source data")
+                .addRequiredOption("o", "output", true, "output path of the compressed data")
+                .addOption("s", true, "the max compressed file size")
+                .addRequiredOption("d", "unzip", true, "output path of the decompressed data");
+
+        CommandLineParser parser = new DefaultParser();
+        CommandLine cmd = parser.parse(options, args);
+
+        String data = cmd.getOptionValue("i");
+        String compressedPath = cmd.getOptionValue("o");
+        String decompressedPath = cmd.getOptionValue("d");
+
+        int size = Integer.parseInt(cmd.getOptionValue("s"));
 
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
-        CompressPipeline compressPipeline = new CompressPipeline("src", "output", 21);
+        CompressPipeline compressPipeline = new CompressPipeline(data, compressedPath, size);
         compressPipeline.compress();
 
-        System.out.println("=============" + stopWatch.getTime());
-        DecompressPipeline decompressPipeline = new DecompressPipeline("output", "unzip");
+        System.out.println("compress time :" + stopWatch.getTime());
+        DecompressPipeline decompressPipeline = new DecompressPipeline(compressedPath, decompressedPath);
         decompressPipeline.decompress();
         stopWatch.stop();
-        System.out.println("=============" + stopWatch.getTime());
+        System.out.println("decompress time : " + stopWatch.getTime());
 
     }
 }
