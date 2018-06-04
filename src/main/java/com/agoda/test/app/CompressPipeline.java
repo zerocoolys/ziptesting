@@ -58,18 +58,31 @@ public class CompressPipeline implements ByteType {
 
     public void compress() throws IOException {
 
+        if (Files.exists(this.output)) {
+            Files.list(this.output).filter(path -> path.getFileName().toString().startsWith("default.data"))
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    });
+        } else {
+            Files.createDirectories(this.output);
+        }
+
+
         wrapper = new OutputStreamWrapper(this.output, this.size);
         wrapper.init();
 
         Path parent = this.output.getParent();
-        if (parent != null) {
+        if (parent != null && !Files.exists(parent)) {
             Files.createDirectories(parent);
         }
 
         int bufSize = ByteBufUtils.requireArray();
         wrapper.writeInt(bufSize);
         doCompress(this.input, size);
-
 
     }
 
@@ -78,7 +91,7 @@ public class CompressPipeline implements ByteType {
         try {
             long fileCount = Files
                     .find(file, Integer.MAX_VALUE, (path, basicFileAttributes) -> basicFileAttributes.isRegularFile())
-                    .filter(Predicates.pathTypePredicate)
+                    .filter(Predicates.FILE_TYPE_PREDICATE)
                     .count();
             System.out.println("fileCount = " + fileCount);
 
@@ -111,6 +124,7 @@ public class CompressPipeline implements ByteType {
             }
         }
 
+        this.wrapper.close();
         compressWorkerExecutor.shutdown();
     }
 
@@ -130,7 +144,7 @@ public class CompressPipeline implements ByteType {
 
         try (Stream<Path> dirs = Files.list(file)) {
 
-            List<CompressWorker> files = dirs.filter(Predicates.allPredicate)
+            List<CompressWorker> files = dirs.filter(Predicates.ALL_FILE_PREDICATE)
                     .map(path -> new CompressWorker(size, this.compressHandler, this.inputRoot, this.output, Arrays.asList(path)))
                     .collect(Collectors.toList());
             callables.addAll(files);
@@ -140,8 +154,7 @@ public class CompressPipeline implements ByteType {
         }
 
         try (Stream<Path> dirs = Files.list(file)) {
-            dirs.filter(path -> !path.getFileName().toString().startsWith("."))
-                    .filter(Files::isDirectory)
+            dirs.filter(Predicates.ALL_DIR_PREDICATE)
                     .forEach(path -> this.doCompressDir(path, size));
 
         } catch (IOException e) {

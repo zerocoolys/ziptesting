@@ -29,20 +29,14 @@ public class OutputStreamWrapper implements ByteType {
     private String fileName = FILENAME;
     private OutputStream outputStream;
 
-    public OutputStreamWrapper(Path output, int size) throws IOException {
+    public OutputStreamWrapper(Path output, int size) {
         this.size = size;
         this.id = 0;
         this.outputPath = output;
-
-        Files.createDirectories(this.outputPath);
     }
 
     public boolean init() {
         try {
-            Files.list(this.outputPath).filter(path -> path.getFileName().toString().startsWith(fileName)).forEach(path -> {
-                path.toFile().delete();
-            });
-
             this.outputStream = Files.newOutputStream(Paths.get(outputPath.toString(), fileName), StandardOpenOption.CREATE);
             fileNames.add(fileName);
             return true;
@@ -119,5 +113,16 @@ public class OutputStreamWrapper implements ByteType {
 
     public List<String> getFileNames() {
         return fileNames;
+    }
+
+    public void close() {
+        if (this.outputStream != null) {
+            try {
+                this.outputStream.flush();
+                this.outputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }
