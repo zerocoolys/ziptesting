@@ -39,13 +39,12 @@ public class Main {
         compressPipeline.compress();
 
 
-        System.out.println("compress time :" + stopWatch.getTime());
-        System.out.println(new Date());
+        long compressTime = stopWatch.getTime();
+        System.out.println("compress time :" + compressTime);
         DecompressPipeline decompressPipeline = new DecompressPipeline(compressedPath, decompressedPath);
         decompressPipeline.decompress();
         stopWatch.stop();
-        System.out.println(new Date());
-        System.out.println("decompress time : " + stopWatch.getTime());
+        System.out.println("decompress time : " + (stopWatch.getTime() - compressTime));
 
     }
 }
