@@ -6,6 +6,7 @@ import org.apache.commons.cli.*;
 import org.apache.commons.lang3.time.StopWatch;
 
 import java.io.IOException;
+import java.util.Date;
 
 /**
  * Main
@@ -37,10 +38,13 @@ public class Main {
         CompressPipeline compressPipeline = new CompressPipeline(data, compressedPath, size);
         compressPipeline.compress();
 
+
         System.out.println("compress time :" + stopWatch.getTime());
+        System.out.println(new Date());
         DecompressPipeline decompressPipeline = new DecompressPipeline(compressedPath, decompressedPath);
         decompressPipeline.decompress();
         stopWatch.stop();
+        System.out.println(new Date());
         System.out.println("decompress time : " + stopWatch.getTime());
 
     }

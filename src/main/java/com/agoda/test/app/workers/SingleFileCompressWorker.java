@@ -30,7 +30,7 @@ public class SingleFileCompressWorker implements Callable<List<String>> {
     }
 
     @Override
-    public List<String> call() throws Exception {
+    public List<String> call() {
 
         OutputStreamWrapper outputStreamWrapper = new OutputStreamWrapper(this.output, this.size);
         outputStreamWrapper.setFileName(id);

@@ -15,6 +15,7 @@
         <args.input>/Users/yousheng/workspace/go</args.input>
         <args.output>/Users/yousheng/workspace/go_output</args.output>
         <args.unzip>/Users/yousheng/workspace/go_unzip</args.unzip>
+        <args.size>20</args.size>
     </properties>
 
     <dependencies>
@@ -53,7 +54,7 @@
                 <configuration>
                     <mainClass>com.agoda.test.Main</mainClass>
                     <commandlineArgs>
-                        -s 20 -i ${args.input} -o ${args.output} -d ${args.unzip}
+                        -s ${args.size} -i ${args.input} -o ${args.output} -d ${args.unzip}
                     </commandlineArgs>
                 </configuration>
             </plugin>
